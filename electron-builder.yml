@@ -1,0 +1,24 @@
+appId: com.victoralves.wslconfig
+productName: WSL-Config
+directories:
+  output: release
+  buildResources: build
+files:
+  - package.json
+  - desktop/dist/**
+  - build/icon.png
+# The UI is served by express from a plain folder, outside app.asar.
+extraResources:
+  - from: client/dist
+    to: client
+win:
+  target: nsis
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: WSL-Config
+  artifactName: WSL-Config-Setup-${version}.exe
