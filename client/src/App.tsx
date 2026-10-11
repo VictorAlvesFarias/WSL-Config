@@ -6,12 +6,13 @@ import { ImagesView } from './components/ImagesView';
 import { JobsBar } from './components/JobsBar';
 import { MachinesView } from './components/MachinesView';
 import { Modal } from './components/Modal';
+import { PortsView } from './components/PortsView';
 import { ResourcesView } from './components/ResourcesView';
 import { SettingsDialog } from './components/SettingsDialog';
 import type { AppData, Notice, SystemInfo } from './types';
 import { useServerEvents } from './useServerEvents';
 
-type Tab = 'machines' | 'resources' | 'images' | 'backups';
+type Tab = 'machines' | 'resources' | 'ports' | 'images' | 'backups';
 
 interface Toast {
   id: number;
@@ -22,6 +23,7 @@ interface Toast {
 const tabs: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: 'machines', label: 'Máquinas', icon: 'layers' },
   { id: 'resources', label: 'Recursos', icon: 'cpu' },
+  { id: 'ports', label: 'Portas', icon: 'globe' },
   { id: 'images', label: 'Imagens', icon: 'image' },
   { id: 'backups', label: 'Backups', icon: 'archive' },
 ];
@@ -121,6 +123,7 @@ export function App() {
       <main>
         {data && state && tab === 'machines' && <MachinesView data={data} state={state} log={log} onNotify={notify} />}
         {state && tab === 'resources' && <ResourcesView state={state} log={log} onShutdown={() => setDialog('shutdown')} onNotify={notify} />}
+        {state && tab === 'ports' && <PortsView state={state} onNotify={notify} />}
         {data && tab === 'images' && <ImagesView data={data} log={log} onNotify={notify} />}
         {data && state && tab === 'backups' && <BackupsView data={data} state={state} log={log} onNotify={notify} />}
       </main>

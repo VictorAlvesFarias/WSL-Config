@@ -59,6 +59,16 @@ Only the keys you change are rewritten: comments, unknown keys, the BOM and the 
 
 > Resources can't be limited per distro: WSL 2 runs every distro in the same VM, so the limits are for all of them together.
 
+### Portas
+
+Every TCP/UDP port listening in the running distros (`ss -tulpn` as root, or `netstat` where `ss` is missing, e.g. Alpine), with:
+
+- the **process and PID**, and the **distro** that owns it. Distros share the VM's network, so each one lists every socket, but only the owner can name the process;
+- the **Docker container** that publishes the port, when `docker` runs in that distro;
+- **Windows**: whether WSL forwards it to `localhost` on Windows (a `wslrelay.exe` listener). TCP ones link straight to `http://localhost:<port>`. The rest are still reachable through the VM IP shown at the top.
+
+You can filter by port, process, container or distro, by protocol, and keep only the ones Windows reaches. The list refreshes every 5 seconds while the tab is open. Stopped distros aren't started just to be scanned.
+
 ### Imagens
 
 Root filesystems (`.tar`, `.tar.gz`, `.tar.xz`) and disks (`.vhdx`) that new distros are created from: add a file from disk (it stays where it is), download one (https, e.g. the official Alpine/Arch/Fedora rootfs) or save a configured distro as an image. *Criar distro* imports it (`wsl --import`) into `<distros folder>\<name>` or a folder you choose.

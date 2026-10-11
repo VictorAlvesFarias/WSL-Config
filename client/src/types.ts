@@ -115,3 +115,22 @@ export interface OnlineDistro {
   name: string;
   friendlyName: string;
 }
+
+export interface OpenPort {
+  protocol: 'tcp' | 'udp';
+  address: string;
+  port: number;
+  process: string | null;
+  pid: number | null;
+  distro: string | null;
+  container: string | null;
+  windows: boolean;
+}
+
+export interface PortsReport {
+  ports: OpenPort[];
+  vmAddress: string | null;
+  scanned: string[];
+  errors: Array<{ distro: string; message: string }>;
+  checkedAt: string;
+}

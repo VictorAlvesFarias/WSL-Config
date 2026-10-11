@@ -1579,3 +1579,79 @@ select.select {
   flex: none;
   flex-wrap: nowrap;
 }
+
+/* Portas */
+.ports {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ports .banner {
+  margin-bottom: 0;
+}
+
+.ports-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.ports-search {
+  flex: 1 1 260px;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ports-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ports-filters .segmented {
+  align-self: center;
+}
+
+.ports-table-card {
+  overflow-x: auto;
+}
+
+.ports-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ports-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ports-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.ports-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ports-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.block {
+  display: block;
+}

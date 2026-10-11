@@ -1,4 +1,4 @@
-import type { AppData, DistroInside, ExportFormat, FieldValues, ImageEntry, OnlineDistro, Settings, SystemInfo, WslConfig } from './types';
+import type { AppData, DistroInside, ExportFormat, FieldValues, ImageEntry, OnlineDistro, PortsReport, Settings, SystemInfo, WslConfig } from './types';
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -22,6 +22,7 @@ export const api = {
   saveSettings: (settings: Settings) => request<Settings>('PUT', '/settings', settings),
   system: () => request<SystemInfo>('GET', '/system'),
   online: () => request<OnlineDistro[]>('GET', '/online'),
+  ports: () => request<PortsReport>('GET', '/ports'),
   shutdown: () => request<Ok>('POST', '/system/shutdown'),
   pickFile: (kind: 'image' | 'any') => request<{ path: string | null }>('POST', '/dialog/file', { kind }),
   pickFolder: () => request<{ path: string | null }>('POST', '/dialog/folder'),

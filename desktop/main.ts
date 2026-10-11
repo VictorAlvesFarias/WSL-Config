@@ -12,6 +12,8 @@ configurePaths({ clientDistDir: app.isPackaged ? join(process.resourcesPath, 'cl
 
 let mainWindow: BrowserWindow | null = null;
 
+const opensExternally = (url: string) => url.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url);
+
 function createWindow(port: number) {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -30,15 +32,16 @@ function createWindow(port: number) {
   mainWindow.loadURL(origin);
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
-  // External links open in the real browser, never inside the app.
+  // External links open in the real browser, never inside the app. Besides https, that includes the
+  // services the distros publish on localhost (the Portas tab links to them).
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) void shell.openExternal(url);
+    if (opensExternally(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(origin)) {
       event.preventDefault();
-      if (url.startsWith('https://')) void shell.openExternal(url);
+      if (opensExternally(url)) void shell.openExternal(url);
     }
   });
   // Exports and imports run in wsl.exe: closing midway leaves a half-written file and no library

@@ -9,6 +9,7 @@ import { dataChanged, listenerCount, recentLog, say, state, subscribe } from './
 import { startJob } from './jobs.ts';
 import * as library from './library.ts';
 import { paths } from './paths.ts';
+import { collectPorts } from './ports.ts';
 import { refreshStatus } from './status.ts';
 import { mutate, type Settings } from './store.ts';
 import {
@@ -97,6 +98,10 @@ export function createApp() {
 
   app.get('/api/online', async (_req, res) => {
     res.json(await wsl.onlineDistros());
+  });
+
+  app.get('/api/ports', async (_req, res) => {
+    res.json(await collectPorts());
   });
 
   app.post('/api/system/shutdown', (_req, res) => {
