@@ -2,9 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { bytes, formatLabels } from '../format';
 import { exportFormats, type Distro, type ExportFormat, type Settings } from '../types';
-import { ConfirmName, PathInput } from './Fields';
-import { Icon } from './Icon';
-import { Modal } from './Modal';
+import { ConfirmName, FormError, Note, PathInput, UnitInput, Warn } from './Fields';
+import { Button } from './ui/Button';
+import { Checkbox, FormField, Input, Select } from './ui/Input';
+import { Modal } from './ui/Modal';
 
 export type DistroDialogKind = 'backup' | 'image' | 'duplicate' | 'move' | 'resize' | 'delete';
 
@@ -19,7 +20,7 @@ interface DialogProps {
   onStarted: (message: string) => void;
 }
 
-function useSubmit(action: () => Promise<unknown>, onDone: () => void) {
+export function useSubmit(action: () => Promise<unknown>, onDone: () => void) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,32 +40,31 @@ function useSubmit(action: () => Promise<unknown>, onDone: () => void) {
   return { saving, error, submit };
 }
 
-function Footer({ saving, label, danger, onClose, disabled }: { saving: boolean; label: string; danger?: boolean; onClose: () => void; disabled?: boolean }) {
+/** Cancel + the dialog's action, submitting the form whose id is given. */
+export function DialogFooter({ form, saving, label, danger, onClose, disabled }: { form: string; saving: boolean; label: string; danger?: boolean; onClose: () => void; disabled?: boolean }) {
   return (
     <>
-      <span className="spacer" />
-      <button type="button" className="button ghost" onClick={onClose}>
+      <Button variant="ghost" onClick={onClose}>
         Cancelar
-      </button>
-      <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={saving || disabled}>
+      </Button>
+      <Button type="submit" form={form} variant={danger ? 'danger' : 'primary'} disabled={saving || disabled}>
         {saving ? 'Enviando…' : label}
-      </button>
+      </Button>
     </>
   );
 }
 
-function FormatSelect({ value, onChange }: { value: ExportFormat; onChange: (value: ExportFormat) => void }) {
+export function FormatSelect({ value, onChange }: { value: ExportFormat; onChange: (value: ExportFormat) => void }) {
   return (
-    <label className="field">
-      <span>Formato</span>
-      <select value={value} onChange={(e) => onChange(e.target.value as ExportFormat)}>
+    <FormField label="Formato">
+      <Select value={value} onChange={(e) => onChange(e.target.value as ExportFormat)}>
         {exportFormats.map((format) => (
           <option key={format} value={format}>
             {formatLabels[format]}
           </option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </FormField>
   );
 }
 
@@ -83,14 +83,11 @@ interface ShutdownConsentProps {
 export function ShutdownConsent({ vmRunning, runningDistros, checked, onChange }: ShutdownConsentProps) {
   if (!vmRunning) return null;
   return (
-    <div className="consent">
-      <p className="hint warn-text small">
-        <Icon name="alert" size={13} /> Isto mexe no arquivo do disco, que a VM do WSL mantém preso enquanto está ligada, mesmo com a distro parada.
-      </p>
-      <label className="check">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <div className="space-y-2.5">
+      <Warn>Isto mexe no arquivo do disco, que a VM do WSL mantém preso enquanto está ligada, mesmo com a distro parada.</Warn>
+      <Checkbox checked={checked} onChange={onChange}>
         Desligar o WSL antes{runningDistros.length ? ` (encerra ${runningDistros.join(', ')})` : ''}
-      </label>
+      </Checkbox>
     </div>
   );
 }
@@ -129,84 +126,78 @@ export function DistroDialog({ kind, distro, settings, vmRunning, runningDistros
 
   return (
     <Modal
+      open
+      onOpenChange={(open) => !open && onClose()}
       title={action.title}
-      onClose={onClose}
-      onSubmit={submit}
-      footer={<Footer saving={saving} label={action.label} danger={action.danger} onClose={onClose} disabled={blocked} />}
+      footer={<DialogFooter form="distro-dialog" saving={saving} label={action.label} danger={action.danger} onClose={onClose} disabled={blocked} />}
     >
-      {kind === 'backup' && (
-        <>
-          <FormatSelect value={format} onChange={setFormat} />
-          <label className="field">
-            <span>Observação (opcional)</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Antes de atualizar o Node…" maxLength={200} />
-          </label>
-          <p className="muted small">
-            Salvo em <code>{settings.backupsDir}\{distro.name}</code>.
-          </p>
-          {consentBox}
-        </>
-      )}
+      <form id="distro-dialog" onSubmit={submit} className="space-y-4 px-5 py-4">
+        {kind === 'backup' && (
+          <>
+            <FormatSelect value={format} onChange={setFormat} />
+            <FormField label="Observação (opcional)">
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Antes de atualizar o Node…" maxLength={200} />
+            </FormField>
+            <Note>
+              Salvo em <code className="font-mono text-fg">{settings.backupsDir}\{distro.name}</code>.
+            </Note>
+            {consentBox}
+          </>
+        )}
 
-      {kind === 'image' && (
-        <>
-          <label className="field">
-            <span>Nome da imagem</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${distro.name} configurada`} autoFocus maxLength={80} />
-          </label>
-          <FormatSelect value={format} onChange={setFormat} />
-          <p className="muted small">Uma imagem é um modelo: novas distros podem ser criadas a partir dela na aba Imagens.</p>
-          {consentBox}
-        </>
-      )}
+        {kind === 'image' && (
+          <>
+            <FormField label="Nome da imagem">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${distro.name} configurada`} autoFocus maxLength={80} />
+            </FormField>
+            <FormatSelect value={format} onChange={setFormat} />
+            <Note>Uma imagem é um modelo: novas distros podem ser criadas a partir dela na aba Imagens.</Note>
+            {consentBox}
+          </>
+        )}
 
-      {kind === 'duplicate' && (
-        <>
-          <label className="field">
-            <span>Nome da cópia</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${distro.name}-copia`} autoFocus required />
-          </label>
-          <PathInput label="Pasta (opcional)" kind="folder" value={location} onChange={setLocation} placeholder={`${settings.distrosDir}\\${name || 'nome'}`} />
-          <p className="muted small">Exporta a distro e importa a cópia com outro nome; o espaço em disco usado dobra.</p>
-        </>
-      )}
+        {kind === 'duplicate' && (
+          <>
+            <FormField label="Nome da cópia">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${distro.name}-copia`} autoFocus required />
+            </FormField>
+            <PathInput label="Pasta (opcional)" kind="folder" value={location} onChange={setLocation} placeholder={`${settings.distrosDir}\\${name || 'nome'}`} />
+            <Note>Exporta a distro e importa a cópia com outro nome; o espaço em disco usado dobra.</Note>
+          </>
+        )}
 
-      {kind === 'move' && (
-        <>
-          <p className="muted small">
-            Hoje em <code>{distro.basePath}</code>
-          </p>
-          <PathInput label="Nova pasta" kind="folder" value={location} onChange={setLocation} required placeholder="D:\WSL\..." />
-          {consentBox}
-        </>
-      )}
+        {kind === 'move' && (
+          <>
+            <Note>
+              Hoje em <code className="font-mono text-fg">{distro.basePath}</code>
+            </Note>
+            <PathInput label="Nova pasta" kind="folder" value={location} onChange={setLocation} required placeholder="D:\WSL\..." />
+            {consentBox}
+          </>
+        )}
 
-      {kind === 'resize' && (
-        <>
-          <label className="field">
-            <span>Tamanho máximo do disco</span>
-            <div className="input-unit">
-              <input type="number" min={1} max={16384} value={sizeGb} onChange={(e) => setSizeGb(Number(e.target.value))} required />
-              <span>GB</span>
-            </div>
-            <small className="muted">
-              O vhdx ocupa hoje {bytes(distro.vhdSize)} no Windows. Diminuir abaixo do que já está em uso falha.
-            </small>
-          </label>
-          {consentBox}
-        </>
-      )}
+        {kind === 'resize' && (
+          <>
+            <FormField label="Tamanho máximo do disco" hint={`O vhdx ocupa hoje ${bytes(distro.vhdSize)} no Windows. Diminuir abaixo do que já está em uso falha.`}>
+              <UnitInput unit="GB">
+                <Input className="pr-10" type="number" min={1} max={16384} value={sizeGb} onChange={(e) => setSizeGb(Number(e.target.value))} required />
+              </UnitInput>
+            </FormField>
+            {consentBox}
+          </>
+        )}
 
-      {kind === 'delete' && (
-        <>
-          <p className="form-error">
-            Isto apaga o disco de <strong>{distro.name}</strong> ({bytes(distro.vhdSize)}) com tudo o que há dentro. Os backups e imagens dela continuam.
-          </p>
-          <ConfirmName expected={distro.name} value={confirm} onChange={setConfirm} />
-        </>
-      )}
+        {kind === 'delete' && (
+          <>
+            <FormError>
+              Isto apaga o disco de <strong>{distro.name}</strong> ({bytes(distro.vhdSize)}) com tudo o que há dentro. Os backups e imagens dela continuam.
+            </FormError>
+            <ConfirmName expected={distro.name} value={confirm} onChange={setConfirm} />
+          </>
+        )}
 
-      {error && <p className="form-error">{error}</p>}
+        {error && <FormError>{error}</FormError>}
+      </form>
     </Modal>
   );
 }

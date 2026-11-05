@@ -1,4 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
+import {
+  Archive,
+  ArrowLeft,
+  Copy,
+  FolderOpen,
+  HardDrive,
+  Image,
+  LoaderCircle,
+  Play,
+  Power,
+  Save,
+  SlidersHorizontal,
+  Square,
+  SquareTerminal,
+  Star,
+  Trash2,
+  TriangleAlert,
+  UserRound,
+} from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { wslConfGroups } from '../fields';
 import { bytes, dateTime } from '../format';
@@ -6,7 +25,12 @@ import type { AppData, Distro, DistroInside, PanelState } from '../types';
 import { ConfigEditor } from './ConfigEditor';
 import type { DistroDialogKind } from './DistroDialogs';
 import { jobFor } from './DistroList';
-import { Icon } from './Icon';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Select } from './ui/Input';
+import { Panel, PanelHeader } from './ui/Panel';
+import { Switch } from './ui/Switch';
+import { Tip } from './ui/Tip';
 
 interface DistroPanelProps {
   distro: Distro;
@@ -15,6 +39,15 @@ interface DistroPanelProps {
   onBack: () => void;
   onDialog: (kind: DistroDialogKind) => void;
   onNotify: (kind: 'ok' | 'error', message: string) => void;
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-fg-subtle">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </>
+  );
 }
 
 /** Screen 2: one distro. What lives inside it (users, wsl.conf, disk usage) needs it running. */
@@ -49,6 +82,7 @@ export function DistroPanel({ distro, data, state, onBack, onDialog, onNotify }:
   useEffect(() => {
     setInside(null);
     if (distro.running) void load(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [distro.name]);
 
   async function act(label: string, action: () => Promise<unknown>, okMessage?: string) {
@@ -63,167 +97,197 @@ export function DistroPanel({ distro, data, state, onBack, onDialog, onNotify }:
     }
   }
 
-  async function restart() {
-    await act('restart', async () => {
-      await api.stop(distro.name);
-      await api.start(distro.name);
-      await load(false);
-    }, `${distro.name} reiniciada`);
-  }
+  const restart = () =>
+    act(
+      'restart',
+      async () => {
+        await api.stop(distro.name);
+        await api.start(distro.name);
+        await load(false);
+      },
+      `${distro.name} reiniciada`,
+    );
 
   const used = inside?.disk ? inside.disk.used : null;
 
   return (
-    <div className="connection-screen">
-      <section className="card connection-panel">
-        <header className="connection-head">
-          <button className="icon-button" onClick={onBack} title="Voltar">
-            <Icon name="back" />
-          </button>
-          <div className="connection-title">
-            <h2>
-              {distro.name} {distro.isDefault && <span className="chip chip-accent">Padrão</span>}
+    <>
+      <Panel className="overflow-hidden">
+        <header className="flex items-center gap-2 border-b border-line px-2 py-2">
+          <Tip content="Voltar para as máquinas">
+            <Button size="icon" variant="ghost" className="size-8" onClick={onBack} aria-label="Voltar">
+              <ArrowLeft />
+            </Button>
+          </Tip>
+          <div className="min-w-0 flex-1">
+            <h2 className="flex items-center gap-2 truncate text-[15px] font-semibold">
+              {distro.name}
+              {distro.isDefault && (
+                <Badge tone="accent">
+                  <Star /> Padrão
+                </Badge>
+              )}
             </h2>
-            <span className="muted small">
+            <p className="truncate text-[12px] text-fg-muted">
               {inside?.os || [distro.flavor, distro.osVersion].filter(Boolean).join(' ') || 'Linux'} · WSL {distro.version}
               {inside?.kernel && ` · kernel ${inside.kernel}`}
-            </span>
+            </p>
           </div>
-          <span className={`chip ${distro.running ? 'chip-ok' : ''}`}>{job ? 'Ocupada' : distro.running ? 'Rodando' : 'Parada'}</span>
+          <Badge tone={job ? 'warn' : distro.running ? 'ok' : 'neutral'} className="mr-2">
+            {job ? 'Ocupada' : distro.running ? 'Rodando' : 'Parada'}
+          </Badge>
         </header>
 
         {job && (
-          <div className="banner warn">
-            <Icon name="refresh" />
-            <span>{job.label}…</span>
+          <div className="flex items-center gap-2 border-b border-line bg-warn-soft px-4 py-2 text-[12.5px] text-warn">
+            <LoaderCircle className="size-3.5 animate-spin" />
+            {job.label}…
           </div>
         )}
-
         {pending && (
-          <div className="banner warn">
-            <Icon name="alert" />
-            <span>O wsl.conf mudou: reinicie a distro para aplicar.</span>
-            <span className="spacer" />
-            <button className="button small" onClick={restart} disabled={busy}>
+          <div className="flex items-center gap-3 border-b border-line bg-warn-soft px-4 py-2 text-[12.5px] text-warn">
+            <TriangleAlert className="size-3.5 shrink-0" />
+            <span className="flex-1">O wsl.conf mudou: reinicie a distro para aplicar.</span>
+            <Button size="sm" onClick={() => void restart()} disabled={busy}>
               {acting === 'restart' ? 'Reiniciando…' : 'Reiniciar distro'}
-            </button>
+            </Button>
           </div>
         )}
 
-        <div className="action-row">
+        <div className="flex flex-wrap gap-2 px-4 py-3">
           {distro.running ? (
-            <button className="button" onClick={() => act('stop', () => api.stop(distro.name))} disabled={busy}>
-              <Icon name="stop" />
+            <Button onClick={() => void act('stop', () => api.stop(distro.name))} disabled={busy}>
+              <Square />
               {acting === 'stop' ? 'Parando…' : 'Parar'}
-            </button>
+            </Button>
           ) : (
-            <button className="button primary" onClick={() => act('start', async () => { await api.start(distro.name); await load(false); })} disabled={busy}>
-              <Icon name="play" />
+            <Button
+              variant="primary"
+              onClick={() =>
+                void act('start', async () => {
+                  await api.start(distro.name);
+                  await load(false);
+                })
+              }
+              disabled={busy}
+            >
+              <Play />
               {acting === 'start' ? 'Iniciando…' : 'Iniciar'}
-            </button>
+            </Button>
           )}
-          <button className="button" onClick={() => act('terminal', () => api.terminal(distro.name))} disabled={busy}>
-            <Icon name="terminal" />
+          <Button onClick={() => void act('terminal', () => api.terminal(distro.name))} disabled={busy}>
+            <SquareTerminal />
             Terminal
-          </button>
-          <button className="button" onClick={() => act('files', () => api.files(distro.name))} disabled={busy}>
-            <Icon name="folder" />
+          </Button>
+          <Button onClick={() => void act('files', () => api.files(distro.name))} disabled={busy}>
+            <FolderOpen />
             Arquivos
-          </button>
+          </Button>
           {!distro.isDefault && (
-            <button className="button" onClick={() => act('default', () => api.makeDefault(distro.name), `${distro.name} é a distro padrão`)} disabled={busy}>
-              <Icon name="star" />
+            <Button onClick={() => void act('default', () => api.makeDefault(distro.name), `${distro.name} é a distro padrão`)} disabled={busy}>
+              <Star />
               Tornar padrão
-            </button>
+            </Button>
           )}
         </div>
-      </section>
 
-      <div className="info-grid">
-        <section className="card settings-section">
-          <h3>
-            <Icon name="disk" /> Disco
-          </h3>
-          <dl className="facts">
-            <dt>No Windows</dt>
-            <dd>{distro.vhdPath ? bytes(distro.vhdSize) : 'WSL 1: arquivos soltos'}</dd>
-            <dt>Em uso no Linux</dt>
-            <dd>{used !== null ? `${bytes(used)} de ${bytes(inside?.disk?.total)}` : '—'}</dd>
-            <dt>Pasta</dt>
-            <dd className="mono small break">{distro.basePath}</dd>
+        <label className="flex items-center gap-3 border-t border-line px-4 py-3">
+          <Power className="size-4 shrink-0 text-fg-muted" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium">Iniciar com o Windows</span>
+            <span className="block text-[12px] text-fg-muted">
+              Sobe a distro quando você entra no Windows e a mantém rodando, sem abrir janela. Parar a distro vale até o próximo logon.
+            </span>
+          </span>
+          <Switch
+            checked={distro.autostart}
+            disabled={busy}
+            onCheckedChange={(enabled) =>
+              void act('autostart', () => api.setAutostart(distro.name, enabled), enabled ? `${distro.name} vai iniciar com o Windows` : `${distro.name} não inicia mais com o Windows`)
+            }
+            aria-label="Iniciar com o Windows"
+          />
+        </label>
+      </Panel>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <Panel className="flex flex-col">
+          <PanelHeader icon={<HardDrive />} title="Disco" />
+          <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 px-4 py-3 text-[12.5px]">
+            <Fact label="No Windows">{distro.vhdPath ? bytes(distro.vhdSize) : 'WSL 1: arquivos soltos'}</Fact>
+            <Fact label="Em uso no Linux">{used !== null ? `${bytes(used)} de ${bytes(inside?.disk?.total)}` : '—'}</Fact>
+            <Fact label="Pasta">
+              <span className="selectable font-mono text-[11.5px] break-all text-fg-muted">{distro.basePath}</span>
+            </Fact>
           </dl>
-          <div className="action-row">
-            <button className="button small" onClick={() => onDialog('resize')} disabled={busy || distro.version !== 2}>
+          <footer className="mt-auto flex gap-2 border-t border-line px-4 py-2.5">
+            <Button size="sm" onClick={() => onDialog('resize')} disabled={busy || distro.version !== 2}>
               Redimensionar
-            </button>
-            <button className="button small" onClick={() => onDialog('move')} disabled={busy}>
+            </Button>
+            <Button size="sm" onClick={() => onDialog('move')} disabled={busy}>
               Mover
-            </button>
-          </div>
-        </section>
+            </Button>
+          </footer>
+        </Panel>
 
-        <section className="card settings-section">
-          <h3>
-            <Icon name="archive" /> Backups
-          </h3>
-          {backups.length ? (
-            <ul className="mini-list">
-              {backups.map((backup) => (
-                <li key={backup.id}>
-                  <span>{dateTime(backup.createdAt)}</span>
-                  <span className="muted small">
-                    {backup.format} · {bytes(backup.size)}
-                    {!backup.exists && ' · arquivo apagado'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted small">Nenhum backup ainda.</p>
-          )}
-          <div className="action-row">
-            <button className="button small primary" onClick={() => onDialog('backup')} disabled={busy}>
-              <Icon name="archive" />
-              Fazer backup
-            </button>
-            <button className="button small" onClick={() => onDialog('image')} disabled={busy}>
-              <Icon name="image" />
-              Salvar como imagem
-            </button>
-            <button className="button small" onClick={() => onDialog('duplicate')} disabled={busy}>
-              <Icon name="copy" />
-              Duplicar
-            </button>
+        <Panel className="flex flex-col">
+          <PanelHeader icon={<Archive />} title="Backups" />
+          <div className="px-4 py-3">
+            {backups.length ? (
+              <ul className="space-y-1 text-[12.5px]">
+                {backups.map((backup) => (
+                  <li key={backup.id} className="flex justify-between gap-3">
+                    <span>{dateTime(backup.createdAt)}</span>
+                    <span className="text-fg-muted">
+                      {backup.format} · {bytes(backup.size)}
+                      {!backup.exists && ' · arquivo apagado'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[12.5px] text-fg-muted">Nenhum backup ainda.</p>
+            )}
           </div>
-        </section>
+          <footer className="mt-auto flex flex-wrap gap-2 border-t border-line px-4 py-2.5">
+            <Button size="sm" variant="primary" onClick={() => onDialog('backup')} disabled={busy}>
+              <Archive />
+              Fazer backup
+            </Button>
+            <Button size="sm" onClick={() => onDialog('image')} disabled={busy}>
+              <Image />
+              Salvar como imagem
+            </Button>
+            <Button size="sm" onClick={() => onDialog('duplicate')} disabled={busy}>
+              <Copy />
+              Duplicar
+            </Button>
+          </footer>
+        </Panel>
       </div>
 
       {inside ? (
         <>
-          <section className="card settings-section">
-            <h3>
-              <Icon name="user" /> Usuário padrão
-            </h3>
-            <div className="input-row">
-              <select className="select" value={user} onChange={(e) => setUser(e.target.value)}>
+          <Panel>
+            <PanelHeader icon={<UserRound />} title="Usuário padrão" description="Usuário que o terminal e o wsl.exe usam ao entrar na distro." />
+            <div className="flex gap-2 px-4 py-3">
+              <Select className="max-w-sm" value={user} onChange={(e) => setUser(e.target.value)}>
                 {!user && <option value="">—</option>}
                 {inside.users.map((item) => (
                   <option key={item.name} value={item.name}>
                     {item.name} (uid {item.uid})
                   </option>
                 ))}
-              </select>
-              <button
-                className="button"
-                onClick={() => act('user', () => api.setUser(distro.name, user), `Usuário padrão de ${distro.name}: ${user}`)}
+              </Select>
+              <Button
+                onClick={() => void act('user', () => api.setUser(distro.name, user), `Usuário padrão de ${distro.name}: ${user}`)}
                 disabled={busy || !user || inside.users.find((item) => item.name === user)?.uid === distro.defaultUid}
               >
-                <Icon name="save" />
+                <Save />
                 Salvar
-              </button>
+              </Button>
             </div>
-            <small className="muted">Usuário que o terminal e o wsl.exe usam ao entrar na distro.</small>
-          </section>
+          </Panel>
 
           <ConfigEditor
             groups={wslConfGroups}
@@ -250,32 +314,32 @@ export function DistroPanel({ distro, data, state, onBack, onDialog, onNotify }:
           />
         </>
       ) : (
-        <section className="card settings-section">
-          <h3>
-            <Icon name="sliders" /> Configuração da distro (wsl.conf) e usuários
-          </h3>
-          <p className="muted small">
-            {distro.running ? 'Carregando…' : 'A distro está parada. Ler a configuração de dentro dela vai iniciá-la.'}
-          </p>
-          {!distro.running && (
-            <button className="button start" onClick={() => load(true)} disabled={loading || busy}>
-              <Icon name="play" />
-              {loading ? 'Iniciando…' : 'Iniciar e carregar'}
-            </button>
-          )}
-        </section>
+        <Panel>
+          <PanelHeader icon={<SlidersHorizontal />} title="Configuração da distro (wsl.conf) e usuários" />
+          <div className="flex items-center gap-3 px-4 py-3">
+            <p className="flex-1 text-[12.5px] text-fg-muted">
+              {distro.running ? 'Carregando…' : 'A distro está parada. Ler a configuração de dentro dela vai iniciá-la.'}
+            </p>
+            {!distro.running && (
+              <Button onClick={() => void load(true)} disabled={loading || busy}>
+                <Play />
+                {loading ? 'Iniciando…' : 'Iniciar e carregar'}
+              </Button>
+            )}
+          </div>
+        </Panel>
       )}
 
-      <section className="card settings-section danger-zone">
-        <h3>Zona de perigo</h3>
-        <div className="input-row">
-          <p className="muted small spacer">Excluir apaga o disco da distro. Faça um backup antes se quiser guardar algo.</p>
-          <button className="button danger" onClick={() => onDialog('delete')} disabled={busy}>
-            <Icon name="trash" />
+      <Panel className="border-danger/30">
+        <PanelHeader title={<span className="text-danger">Zona de perigo</span>} />
+        <div className="flex items-center gap-3 px-4 py-3">
+          <p className="flex-1 text-[12.5px] text-fg-muted">Excluir apaga o disco da distro. Faça um backup antes se quiser guardar algo.</p>
+          <Button variant="danger" onClick={() => onDialog('delete')} disabled={busy}>
+            <Trash2 />
             Excluir distro
-          </button>
+          </Button>
         </div>
-      </section>
-    </div>
+      </Panel>
+    </>
   );
 }

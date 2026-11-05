@@ -1,12 +1,14 @@
+import { Gauge, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { wslConfigGroups } from '../fields';
 import { bytes } from '../format';
 import type { LogEntry, PanelState, WslConfig } from '../types';
 import { ConfigEditor } from './ConfigEditor';
-import type { FieldDefinition } from './Fields';
-import { Icon } from './Icon';
-import { LogView } from './LogView';
+import { WithLog, type FieldDefinition } from './Fields';
+import { Banner, Page } from './Shell';
+import { Button } from './ui/Button';
+import { Panel } from './ui/Panel';
 
 interface ResourcesViewProps {
   state: PanelState;
@@ -46,34 +48,34 @@ export function ResourcesView({ state, log, onShutdown, onNotify }: ResourcesVie
   const running = state.distros.filter((distro) => distro.running);
 
   return (
-    <div className="panel-layout">
-      <div className="panel-main">
-        <header className="section-head">
-          <div>
-            <h2>Recursos do WSL</h2>
-            <p className="muted small">
-              <code>{config?.path ?? '%UserProfile%\\.wslconfig'}</code>
+    <WithLog log={log}>
+      <Page className="max-w-4xl">
+        <Panel className="flex items-center gap-4 px-4 py-3.5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+            <Gauge className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold">{state.vm.running ? `${bytes(state.vm.memory)} em uso` : 'VM desligada'}</p>
+            <p className="text-[12px] text-fg-muted">
+              {state.vm.running ? `${running.length} distro(s) rodando` : 'nenhuma distro rodando'} · <code className="font-mono">{config?.path ?? '%UserProfile%\\.wslconfig'}</code>
               {config && !config.exists && ' · ainda não existe: será criado ao salvar'}
             </p>
           </div>
-          <div className="vm-meter card">
-            <Icon name="gauge" />
-            <span className="list-text">
-              <strong>{state.vm.running ? bytes(state.vm.memory) : 'VM desligada'}</strong>
-              <span className="muted small">{state.vm.running ? `em uso · ${running.length} distro(s) rodando` : 'nenhuma distro rodando'}</span>
-            </span>
-          </div>
-        </header>
+          <Button onClick={onShutdown} disabled={!state.vm.running}>
+            <RotateCcw />
+            Reiniciar o WSL
+          </Button>
+        </Panel>
 
         {state.pending.vm && (
-          <div className="banner warn">
-            <Icon name="alert" />
-            <span>Há mudanças salvas que só valem depois de reiniciar o WSL.</span>
-            <span className="spacer" />
-            <button className="button small" onClick={onShutdown}>
-              Reiniciar o WSL
-            </button>
-          </div>
+          <Banner tone="warn">
+            <div className="flex items-center gap-3">
+              <span className="flex-1">Há mudanças salvas que só valem depois de reiniciar o WSL.</span>
+              <Button size="sm" onClick={onShutdown}>
+                Reiniciar o WSL
+              </Button>
+            </div>
+          </Banner>
         )}
 
         {config ? (
@@ -85,19 +87,11 @@ export function ResourcesView({ state, log, onShutdown, onNotify }: ResourcesVie
             adjust={adjust}
             onSave={(changes) => run(() => api.saveWslConfig(changes)).then(() => undefined)}
             onSaveText={(text) => run(() => api.saveWslConfigText(text)).then(() => undefined)}
-            footer={
-              <button className="button" onClick={onShutdown} disabled={!state.vm.running}>
-                <Icon name="refresh" />
-                Reiniciar o WSL
-              </button>
-            }
           />
         ) : (
-          <p className="muted">Carregando…</p>
+          <p className="py-10 text-center text-[13px] text-fg-muted">Carregando…</p>
         )}
-      </div>
-
-      <LogView entries={log} />
-    </div>
+      </Page>
+    </WithLog>
   );
 }

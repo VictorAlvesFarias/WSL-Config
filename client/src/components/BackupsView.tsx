@@ -1,12 +1,17 @@
+import { Archive, ArchiveRestore, FolderOpen, Layers, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api } from '../api';
-import { bytes, dateTime, formatLabels } from '../format';
-import { exportFormats, type AppData, type BackupEntry, type ExportFormat, type LogEntry, type PanelState } from '../types';
-import { ShutdownConsent } from './DistroDialogs';
-import { ConfirmName, PathInput } from './Fields';
-import { Icon } from './Icon';
-import { LogView } from './LogView';
-import { Modal } from './Modal';
+import { bytes, dateTime } from '../format';
+import type { AppData, BackupEntry, ExportFormat, LogEntry, PanelState } from '../types';
+import { DialogFooter, FormatSelect, ShutdownConsent } from './DistroDialogs';
+import { ConfirmName, FormError, Note, PathInput, RadioCards, WithLog } from './Fields';
+import { Empty, Page } from './Shell';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { FormField, Input, Select } from './ui/Input';
+import { Modal } from './ui/Modal';
+import { Panel, PanelHeader } from './ui/Panel';
+import { Tip } from './ui/Tip';
 
 interface BackupsViewProps {
   data: AppData;
@@ -15,11 +20,11 @@ interface BackupsViewProps {
   onNotify: (kind: 'ok' | 'error', message: string) => void;
 }
 
-type Dialog = { kind: 'create' } | { kind: 'restore'; backup: BackupEntry } | { kind: 'delete'; backup: BackupEntry };
+export type BackupDialog = { kind: 'create' } | { kind: 'restore'; backup: BackupEntry } | { kind: 'delete'; backup: BackupEntry };
 
 /** Exports of the distros, grouped by distro, that can be restored as a new one or over the original. */
 export function BackupsView({ data, state, log, onNotify }: BackupsViewProps) {
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [dialog, setDialog] = useState<BackupDialog | null>(null);
   const [distro, setDistro] = useState('');
   const [format, setFormat] = useState<ExportFormat>(data.settings.backupFormat);
   const [note, setNote] = useState('');
@@ -34,7 +39,7 @@ export function BackupsView({ data, state, log, onNotify }: BackupsViewProps) {
   const groups = [...new Set(data.backups.map((backup) => backup.distro))].sort();
   const vhdNeedsShutdown = format === 'vhd' && state.vm.running;
 
-  function openDialog(next: Dialog) {
+  function openDialog(next: BackupDialog) {
     setDistro(state.distros[0]?.name ?? '');
     setFormat(data.settings.backupFormat);
     setNote('');
@@ -62,199 +67,167 @@ export function BackupsView({ data, state, log, onNotify }: BackupsViewProps) {
     }
   }
 
-  async function reveal(backup: BackupEntry) {
-    try {
-      await api.revealBackup(backup.id);
-    } catch (err) {
-      onNotify('error', (err as Error).message);
-    }
-  }
-
-  const footer = (label: string, { danger = false, disabled = false } = {}) => (
-    <>
-      <span className="spacer" />
-      <button type="button" className="button ghost" onClick={() => setDialog(null)}>
-        Cancelar
-      </button>
-      <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={saving || disabled}>
-        {saving ? 'Enviando…' : label}
-      </button>
-    </>
-  );
+  const reveal = (backup: BackupEntry) => api.revealBackup(backup.id).catch((err: Error) => onNotify('error', err.message));
+  const close = () => setDialog(null);
+  const modalProps = { open: true, onOpenChange: (open: boolean) => !open && close() };
 
   return (
-    <div className="panel-layout">
-      <div className="panel-main">
-        <header className="section-head">
-          <div>
-            <h2>Backups</h2>
-            <p className="muted small">
-              Pasta: <code>{data.settings.backupsDir}</code>
-            </p>
-          </div>
-          <button className="button primary" onClick={() => openDialog({ kind: 'create' })} disabled={!state.distros.length}>
-            <Icon name="archive" />
-            Fazer backup
-          </button>
-        </header>
+    <WithLog log={log}>
+      <Page>
+        <Panel className="overflow-hidden">
+          <PanelHeader
+            icon={<Archive />}
+            title="Backups"
+            description={
+              <>
+                Pasta: <code className="font-mono">{data.settings.backupsDir}</code>
+              </>
+            }
+            actions={
+              <Button size="sm" variant="primary" onClick={() => openDialog({ kind: 'create' })} disabled={!state.distros.length}>
+                <Archive />
+                Fazer backup
+              </Button>
+            }
+          />
 
-        {groups.length === 0 ? (
-          <div className="card empty-state">
-            <Icon name="archive" size={32} />
-            <h2>Nenhum backup</h2>
-            <p className="muted">Um backup exporta a distro inteira para um arquivo. Ele pode virar uma distro nova ou substituir a original.</p>
-          </div>
-        ) : (
-          groups.map((group) => (
-            <section key={group} className="backup-group">
-              <h3 className="eyebrow">
-                <Icon name="layers" size={13} /> {group}
-              </h3>
-              <ul className="connection-cards">
-                {data.backups
-                  .filter((backup) => backup.distro === group)
-                  .map((backup) => (
-                    <li key={backup.id} className="card connection-card">
-                      <div className="connection-card-body static">
-                        <Icon name="archive" size={20} />
-                        <span className="list-text">
-                          <strong>{dateTime(backup.createdAt)}</strong>
-                          <span className="muted small">
+          {groups.length === 0 ? (
+            <div className="p-4">
+              <Empty icon={<Archive />}>
+                <p className="text-[14px] font-semibold text-fg">Nenhum backup</p>
+                Um backup exporta a distro inteira para um arquivo. Ele pode virar uma distro nova ou substituir a original.
+              </Empty>
+            </div>
+          ) : (
+            groups.map((group) => (
+              <section key={group}>
+                <h3 className="flex items-center gap-1.5 border-b border-line bg-panel-2/60 px-4 py-1.5 text-[11.5px] font-semibold tracking-wide text-fg-subtle uppercase">
+                  <Layers className="size-3.5" /> {group}
+                </h3>
+                <ul className="divide-y divide-line border-b border-line last:border-b-0">
+                  {data.backups
+                    .filter((backup) => backup.distro === group)
+                    .map((backup) => (
+                      <li key={backup.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <Archive className="size-4.5 shrink-0 text-fg-subtle" strokeWidth={1.6} />
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-center gap-2 text-[13px] font-medium">
+                            {dateTime(backup.createdAt)}
+                            {!backup.exists && <Badge tone="warn">arquivo sumiu</Badge>}
+                          </p>
+                          <p className="truncate text-[12px] text-fg-muted">
                             {backup.format} · {bytes(backup.size)}
                             {backup.note && ` · ${backup.note}`}
-                          </span>
-                        </span>
-                        {!backup.exists && <span className="chip chip-warn">arquivo sumiu</span>}
-                      </div>
-                      <button className="icon-button" title="Mostrar no Explorer" onClick={() => reveal(backup)} disabled={!backup.exists}>
-                        <Icon name="folder" />
-                      </button>
-                      <button className="icon-button danger" title="Apagar" onClick={() => openDialog({ kind: 'delete', backup })}>
-                        <Icon name="trash" />
-                      </button>
-                      <button className="button" onClick={() => openDialog({ kind: 'restore', backup })} disabled={!backup.exists}>
-                        <Icon name="restore" />
-                        Restaurar
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ))
-        )}
-      </div>
-
-      <LogView entries={log} />
+                          </p>
+                        </div>
+                        <Tip content="Mostrar no Explorer">
+                          <Button size="icon" variant="ghost" className="size-7" onClick={() => void reveal(backup)} disabled={!backup.exists} aria-label="Mostrar no Explorer">
+                            <FolderOpen />
+                          </Button>
+                        </Tip>
+                        <Tip content="Apagar backup">
+                          <Button size="icon" variant="ghost" className="size-7 hover:text-danger" onClick={() => openDialog({ kind: 'delete', backup })} aria-label="Apagar">
+                            <Trash2 />
+                          </Button>
+                        </Tip>
+                        <Button size="sm" onClick={() => openDialog({ kind: 'restore', backup })} disabled={!backup.exists}>
+                          <ArchiveRestore />
+                          Restaurar
+                        </Button>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </Panel>
+      </Page>
 
       {dialog?.kind === 'create' && (
-        <Modal
-          title="Fazer backup"
-          onClose={() => setDialog(null)}
-          onSubmit={(e) => submit(e, () => api.backup(distro, format, note, vhdNeedsShutdown && consent), 'Backup iniciado')}
-          footer={footer('Fazer backup', { disabled: vhdNeedsShutdown && !consent })}
-        >
-          <label className="field">
-            <span>Distro</span>
-            <select value={distro} onChange={(e) => setDistro(e.target.value)}>
-              {state.distros.map((item) => (
-                <option key={item.id} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Formato</span>
-            <select value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)}>
-              {exportFormats.map((item) => (
-                <option key={item} value={item}>
-                  {formatLabels[item]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Observação (opcional)</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
-          </label>
-          {format === 'vhd' && (
-            <ShutdownConsent
-              vmRunning={state.vm.running}
-              runningDistros={state.distros.filter((item) => item.running).map((item) => item.name)}
-              checked={consent}
-              onChange={setConsent}
-            />
-          )}
-          {error && <p className="form-error">{error}</p>}
+        <Modal {...modalProps} title="Fazer backup" footer={<DialogFooter form="backup-dialog" saving={saving} label="Fazer backup" onClose={close} disabled={vhdNeedsShutdown && !consent} />}>
+          <form id="backup-dialog" onSubmit={(e) => void submit(e, () => api.backup(distro, format, note, vhdNeedsShutdown && consent), 'Backup iniciado')} className="space-y-4 px-5 py-4">
+            <FormField label="Distro">
+              <Select value={distro} onChange={(e) => setDistro(e.target.value)}>
+                {state.distros.map((item) => (
+                  <option key={item.id} value={item.name}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormatSelect value={format} onChange={setFormat} />
+            <FormField label="Observação (opcional)">
+              <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
+            </FormField>
+            {format === 'vhd' && (
+              <ShutdownConsent vmRunning={state.vm.running} runningDistros={state.distros.filter((item) => item.running).map((item) => item.name)} checked={consent} onChange={setConsent} />
+            )}
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
 
       {dialog?.kind === 'restore' && (
         <Modal
+          {...modalProps}
           title={`Restaurar backup de ${dialog.backup.distro}`}
-          onClose={() => setDialog(null)}
-          onSubmit={(e) =>
-            submit(
-              e,
-              () => (mode === 'new' ? api.restoreAsNew(dialog.backup.id, name, location) : api.restoreReplacing(dialog.backup.id, confirm)),
-              'Restauração iniciada',
-            )
+          description={`${dateTime(dialog.backup.createdAt)} · ${dialog.backup.format} · ${bytes(dialog.backup.size)}`}
+          className="w-[min(600px,calc(100vw-32px))]"
+          footer={
+            <DialogFooter
+              form="backup-dialog"
+              saving={saving}
+              label={mode === 'new' ? 'Criar distro' : 'Substituir'}
+              danger={mode === 'replace'}
+              onClose={close}
+              disabled={mode === 'replace' && confirm !== dialog.backup.distro}
+            />
           }
-          footer={footer(mode === 'new' ? 'Criar distro' : 'Substituir', { danger: mode === 'replace', disabled: mode === 'replace' && confirm !== dialog.backup.distro })}
-          wide
         >
-          <p className="muted small">
-            {dateTime(dialog.backup.createdAt)} · {dialog.backup.format} · {bytes(dialog.backup.size)}
-          </p>
-          <div className="radio-cards two">
-            <label className={`radio-card${mode === 'new' ? ' is-selected' : ''}`}>
-              <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
-              <span className="radio-text">
-                <strong>Como nova distro</strong>
-                <span className="muted small">A original continua como está.</span>
-              </span>
-            </label>
-            <label className={`radio-card${mode === 'replace' ? ' is-selected' : ''}`}>
-              <input type="radio" checked={mode === 'replace'} onChange={() => setMode('replace')} />
-              <span className="radio-text">
-                <strong>Substituir {dialog.backup.distro}</strong>
-                <span className="muted small">Apaga a versão atual e volta para o backup.</span>
-              </span>
-            </label>
-          </div>
-          {mode === 'new' ? (
-            <>
-              <label className="field">
-                <span>Nome</span>
-                <input value={name} onChange={(e) => setName(e.target.value)} required />
-              </label>
-              <PathInput label="Pasta (opcional)" kind="folder" value={location} onChange={setLocation} placeholder={`${data.settings.distrosDir}\\${name || 'nome'}`} />
-            </>
-          ) : (
-            <>
-              <p className="form-error">
-                Tudo o que mudou em {dialog.backup.distro} depois deste backup será perdido. O arquivo do backup continua guardado.
-              </p>
-              <ConfirmName expected={dialog.backup.distro} value={confirm} onChange={setConfirm} />
-            </>
-          )}
-          {error && <p className="form-error">{error}</p>}
+          <form
+            id="backup-dialog"
+            onSubmit={(e) =>
+              void submit(e, () => (mode === 'new' ? api.restoreAsNew(dialog.backup.id, name, location) : api.restoreReplacing(dialog.backup.id, confirm)), 'Restauração iniciada')
+            }
+            className="space-y-4 px-5 py-4"
+          >
+            <RadioCards
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: 'new', label: 'Como nova distro', hint: 'A original continua como está.' },
+                { value: 'replace', label: `Substituir ${dialog.backup.distro}`, hint: 'Apaga a versão atual e volta para o backup.' },
+              ]}
+            />
+            {mode === 'new' ? (
+              <>
+                <FormField label="Nome">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} required />
+                </FormField>
+                <PathInput label="Pasta (opcional)" kind="folder" value={location} onChange={setLocation} placeholder={`${data.settings.distrosDir}\\${name || 'nome'}`} />
+              </>
+            ) : (
+              <>
+                <FormError>Tudo o que mudou em {dialog.backup.distro} depois deste backup será perdido. O arquivo do backup continua guardado.</FormError>
+                <ConfirmName expected={dialog.backup.distro} value={confirm} onChange={setConfirm} />
+              </>
+            )}
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
 
       {dialog?.kind === 'delete' && (
-        <Modal
-          title="Apagar backup"
-          onClose={() => setDialog(null)}
-          onSubmit={(e) => submit(e, () => api.deleteBackup(dialog.backup.id), 'Backup apagado')}
-          footer={footer('Apagar', { danger: true })}
-        >
-          <p>
-            Apagar o backup de <strong>{dialog.backup.distro}</strong> de {dateTime(dialog.backup.createdAt)} ({bytes(dialog.backup.size)})? O arquivo é excluído.
-          </p>
-          {error && <p className="form-error">{error}</p>}
+        <Modal {...modalProps} title="Apagar backup" footer={<DialogFooter form="backup-dialog" saving={saving} label="Apagar" danger onClose={close} />}>
+          <form id="backup-dialog" onSubmit={(e) => void submit(e, () => api.deleteBackup(dialog.backup.id), 'Backup apagado')} className="space-y-4 px-5 py-4">
+            <Note>
+              Apagar o backup de <strong className="text-fg">{dialog.backup.distro}</strong> de {dateTime(dialog.backup.createdAt)} ({bytes(dialog.backup.size)})? O arquivo é
+              excluído.
+            </Note>
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
-    </div>
+    </WithLog>
   );
 }

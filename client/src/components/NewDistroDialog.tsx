@@ -1,10 +1,13 @@
+import { Archive, Globe, Image, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { bytes, suggestName } from '../format';
 import type { ImageEntry, OnlineDistro, Settings } from '../types';
-import { PathInput } from './Fields';
-import { Icon } from './Icon';
-import { Modal } from './Modal';
+import { FormError, Note, PathInput } from './Fields';
+import { Button } from './ui/Button';
+import { FormField, Input, Select } from './ui/Input';
+import { Modal } from './ui/Modal';
+import { Segmented } from './ui/Segmented';
 
 type Source = 'online' | 'image' | 'file';
 
@@ -16,6 +19,13 @@ interface NewDistroDialogProps {
   onClose: () => void;
   onStarted: (message: string) => void;
 }
+
+const sourceLabel = (icon: React.ReactNode, text: string) => (
+  <span className="flex items-center justify-center gap-1.5 [&_svg]:size-3.5">
+    {icon}
+    {text}
+  </span>
+);
 
 /** New distro from the online catalog (wsl --install), a library image or any file (wsl --import). */
 export function NewDistroDialog({ settings, images, initialImage, onClose, onStarted }: NewDistroDialogProps) {
@@ -67,78 +77,70 @@ export function NewDistroDialog({ settings, images, initialImage, onClose, onSta
     }
   }
 
-  const sources: Array<{ id: Source; label: string; icon: 'globe' | 'image' | 'archive' }> = [
-    { id: 'online', label: 'Loja online', icon: 'globe' },
-    { id: 'image', label: 'Imagem', icon: 'image' },
-    { id: 'file', label: 'Arquivo', icon: 'archive' },
-  ];
-
   return (
     <Modal
+      open
+      onOpenChange={(open) => !open && onClose()}
       title="Nova distro"
-      onClose={onClose}
-      onSubmit={submit}
-      wide
+      description="Da loja online, de uma imagem da biblioteca ou de qualquer arquivo."
+      className="w-[min(600px,calc(100vw-32px))]"
       footer={
         <>
-          <span className="spacer" />
-          <button type="button" className="button ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" className="button primary" disabled={saving || !name || (source === 'image' && !imageId) || (source === 'file' && !file)}>
-            <Icon name="plus" />
+          </Button>
+          <Button type="submit" form="new-distro" variant="primary" disabled={saving || !name || (source === 'image' && !imageId) || (source === 'file' && !file)}>
+            <Plus />
             {saving ? 'Enviando…' : 'Criar'}
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="segmented">
-        {sources.map((item) => (
-          <button type="button" key={item.id} className={source === item.id ? 'is-active' : ''} onClick={() => setSource(item.id)}>
-            <Icon name={item.icon} size={14} />
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <form id="new-distro" onSubmit={submit} className="space-y-4 px-5 py-4">
+        <Segmented
+          label="Origem"
+          value={source}
+          onChange={setSource}
+          options={[
+            { value: 'online', label: sourceLabel(<Globe />, 'Loja online') },
+            { value: 'image', label: sourceLabel(<Image />, 'Imagem') },
+            { value: 'file', label: sourceLabel(<Archive />, 'Arquivo') },
+          ]}
+        />
 
-      <div className="form-grid">
         {source === 'online' && (
-          <label className="field span-2">
-            <span>Distribuição</span>
+          <FormField label="Distribuição" hint="Baixada direto da internet. Ao abrir o terminal pela primeira vez, ela pede o usuário e a senha.">
             {online ? (
-              <select value={distro} onChange={(e) => setDistro(e.target.value)}>
+              <Select value={distro} onChange={(e) => setDistro(e.target.value)}>
                 {online.map((item) => (
                   <option key={item.name} value={item.name}>
                     {item.friendlyName}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
-              <input value={onlineError ?? 'Buscando a lista…'} disabled />
+              <Input value={onlineError ?? 'Buscando a lista…'} disabled />
             )}
-            <small className="muted">Baixada direto da internet. Ao abrir o terminal pela primeira vez, ela pede o usuário e a senha.</small>
-          </label>
+          </FormField>
         )}
 
         {source === 'image' &&
           (available.length ? (
-            <label className="field span-2">
-              <span>Imagem da biblioteca</span>
-              <select value={imageId} onChange={(e) => setImageId(e.target.value)}>
+            <FormField label="Imagem da biblioteca">
+              <Select value={imageId} onChange={(e) => setImageId(e.target.value)}>
                 {available.map((image) => (
                   <option key={image.id} value={image.id}>
                     {image.name} · {image.format} · {bytes(image.size)}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </FormField>
           ) : (
-            <p className="span-2 muted">A biblioteca está vazia. Adicione imagens na aba Imagens, ou use a opção Arquivo.</p>
+            <Note>A biblioteca está vazia. Adicione imagens na aba Imagens, ou use a opção Arquivo.</Note>
           ))}
 
         {source === 'file' && (
           <PathInput
-            className="span-2"
             label="Arquivo (.tar, .tar.gz, .tar.xz ou .vhdx)"
             kind="image"
             value={file}
@@ -148,9 +150,8 @@ export function NewDistroDialog({ settings, images, initialImage, onClose, onSta
           />
         )}
 
-        <label className="field span-2">
-          <span>Nome</span>
-          <input
+        <FormField label="Nome">
+          <Input
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -159,9 +160,8 @@ export function NewDistroDialog({ settings, images, initialImage, onClose, onSta
             placeholder="dev-box"
             required
           />
-        </label>
+        </FormField>
         <PathInput
-          className="span-2"
           label="Pasta (opcional)"
           kind="folder"
           value={location}
@@ -169,9 +169,9 @@ export function NewDistroDialog({ settings, images, initialImage, onClose, onSta
           placeholder={`${settings.distrosDir}\\${name || 'nome'}`}
           hint="Onde o disco virtual (ext4.vhdx) vai ficar."
         />
-      </div>
 
-      {error && <p className="form-error">{error}</p>}
+        {error && <FormError>{error}</FormError>}
+      </form>
     </Modal>
   );
 }

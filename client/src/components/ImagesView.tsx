@@ -1,25 +1,32 @@
+import { Download, FolderOpen, Image, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { bytes, dateTime } from '../format';
 import type { AppData, ImageEntry, LogEntry } from '../types';
-import { PathInput } from './Fields';
-import { Icon } from './Icon';
-import { LogView } from './LogView';
-import { Modal } from './Modal';
-import { NewDistroDialog } from './NewDistroDialog';
+import { DialogFooter } from './DistroDialogs';
+import { FormError, Note, PathInput, WithLog } from './Fields';
+import { Empty, Page } from './Shell';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Checkbox, FormField, Input } from './ui/Input';
+import { Modal } from './ui/Modal';
+import { Panel, PanelHeader } from './ui/Panel';
+import { Tip } from './ui/Tip';
 
 interface ImagesViewProps {
   data: AppData;
   log: LogEntry[];
+  /** Opens "Nova distro" with this image chosen. */
+  onCreate: (image: ImageEntry) => void;
   onNotify: (kind: 'ok' | 'error', message: string) => void;
 }
 
-type Dialog = { kind: 'add' } | { kind: 'download' } | { kind: 'create'; image: ImageEntry } | { kind: 'delete'; image: ImageEntry };
+type Dialog = { kind: 'add' } | { kind: 'download' } | { kind: 'delete'; image: ImageEntry };
 
 const sourceLabels: Record<ImageEntry['source'], string> = { file: 'Arquivo', download: 'Download', export: 'Exportada' };
 
 /** Root filesystems and disks that new distros are created from. */
-export function ImagesView({ data, log, onNotify }: ImagesViewProps) {
+export function ImagesView({ data, log, onCreate, onNotify }: ImagesViewProps) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [file, setFile] = useState('');
   const [url, setUrl] = useState('');
@@ -52,145 +59,123 @@ export function ImagesView({ data, log, onNotify }: ImagesViewProps) {
     }
   }
 
-  async function reveal(image: ImageEntry) {
-    try {
-      await api.revealImage(image.id);
-    } catch (err) {
-      onNotify('error', (err as Error).message);
-    }
-  }
-
-  const footer = (label: string, danger = false) => (
-    <>
-      <span className="spacer" />
-      <button type="button" className="button ghost" onClick={() => setDialog(null)}>
-        Cancelar
-      </button>
-      <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={saving}>
-        {saving ? 'Enviando…' : label}
-      </button>
-    </>
-  );
+  const reveal = (image: ImageEntry) => api.revealImage(image.id).catch((err: Error) => onNotify('error', err.message));
+  const close = () => setDialog(null);
+  const modalProps = { open: true, onOpenChange: (open: boolean) => !open && close() };
 
   return (
-    <div className="panel-layout">
-      <div className="panel-main">
-        <header className="section-head">
-          <div>
-            <h2>Imagens</h2>
-            <p className="muted small">
-              Modelos para criar distros: rootfs (.tar, .tar.gz, .tar.xz) ou discos (.vhdx). Pasta: <code>{data.settings.imagesDir}</code>
-            </p>
-          </div>
-          <div className="action-row">
-            <button className="button" onClick={() => openDialog({ kind: 'download' })}>
-              <Icon name="download" />
-              Baixar
-            </button>
-            <button className="button primary" onClick={() => openDialog({ kind: 'add' })}>
-              <Icon name="plus" />
-              Adicionar arquivo
-            </button>
-          </div>
-        </header>
+    <WithLog log={log}>
+      <Page>
+        <Panel className="overflow-hidden">
+          <PanelHeader
+            icon={<Image />}
+            title="Imagens"
+            description={
+              <>
+                Modelos para criar distros: rootfs (.tar, .tar.gz, .tar.xz) ou discos (.vhdx). Pasta: <code className="font-mono">{data.settings.imagesDir}</code>
+              </>
+            }
+            actions={
+              <>
+                <Button size="sm" onClick={() => openDialog({ kind: 'download' })}>
+                  <Download />
+                  Baixar
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => openDialog({ kind: 'add' })}>
+                  <Plus />
+                  Adicionar arquivo
+                </Button>
+              </>
+            }
+          />
 
-        {data.images.length === 0 ? (
-          <div className="card empty-state">
-            <Icon name="image" size={32} />
-            <h2>Nenhuma imagem</h2>
-            <p className="muted">
-              Adicione um arquivo do disco, baixe um rootfs oficial (Alpine, Arch, Fedora...) ou salve uma distro configurada como imagem na tela dela.
-            </p>
-          </div>
-        ) : (
-          <ul className="connection-cards">
-            {data.images.map((image) => (
-              <li key={image.id} className="card connection-card">
-                <div className="connection-card-body static">
-                  <Icon name="image" size={20} />
-                  <span className="list-text">
-                    <strong>{image.name}</strong>
-                    <span className="muted small">
+          {data.images.length === 0 ? (
+            <div className="p-4">
+              <Empty icon={<Image />}>
+                <p className="text-[14px] font-semibold text-fg">Nenhuma imagem</p>
+                Adicione um arquivo do disco, baixe um rootfs oficial (Alpine, Arch, Fedora...) ou salve uma distro configurada como imagem na tela dela.
+              </Empty>
+            </div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {data.images.map((image) => (
+                <li key={image.id} className="flex items-center gap-3 px-4 py-3">
+                  <Image className="size-5 shrink-0 text-fg-subtle" strokeWidth={1.6} />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate text-[13.5px] font-medium">
+                      {image.name}
+                      {!image.exists && <Badge tone="warn">arquivo sumiu</Badge>}
+                    </p>
+                    <p className="truncate text-[12px] text-fg-muted">
                       {sourceLabels[image.source]} · {image.format} · {bytes(image.size)} · {dateTime(image.addedAt)}
-                    </span>
-                    <span className="muted small mono ellipsis" title={image.file}>
+                    </p>
+                    <p className="selectable truncate font-mono text-[11.5px] text-fg-subtle" title={image.file}>
                       {image.file}
-                    </span>
-                  </span>
-                  {!image.exists && <span className="chip chip-warn">arquivo sumiu</span>}
-                </div>
-                <button className="icon-button" title="Mostrar no Explorer" onClick={() => reveal(image)} disabled={!image.exists}>
-                  <Icon name="folder" />
-                </button>
-                <button className="icon-button danger" title="Remover" onClick={() => openDialog({ kind: 'delete', image })}>
-                  <Icon name="trash" />
-                </button>
-                <button className="button primary" onClick={() => setDialog({ kind: 'create', image })} disabled={!image.exists}>
-                  <Icon name="plus" />
-                  Criar distro
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <LogView entries={log} />
+                    </p>
+                  </div>
+                  <Tip content="Mostrar no Explorer">
+                    <Button size="icon" variant="ghost" className="size-7" onClick={() => void reveal(image)} disabled={!image.exists} aria-label="Mostrar no Explorer">
+                      <FolderOpen />
+                    </Button>
+                  </Tip>
+                  <Tip content="Remover da biblioteca">
+                    <Button size="icon" variant="ghost" className="size-7 hover:text-danger" onClick={() => openDialog({ kind: 'delete', image })} aria-label="Remover">
+                      <Trash2 />
+                    </Button>
+                  </Tip>
+                  <Button size="sm" variant="primary" onClick={() => onCreate(image)} disabled={!image.exists}>
+                    <Plus />
+                    Criar distro
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </Page>
 
       {dialog?.kind === 'add' && (
-        <Modal title="Adicionar imagem" onClose={() => setDialog(null)} onSubmit={(e) => submit(e, () => api.addImage(file, name), 'Imagem adicionada')} footer={footer('Adicionar')}>
-          <PathInput label="Arquivo" kind="image" value={file} onChange={setFile} required hint="O arquivo continua onde está; a biblioteca só guarda o caminho." />
-          <label className="field">
-            <span>Nome (opcional)</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={file.split('\\').pop() || 'Alpine 3.22'} maxLength={80} />
-          </label>
-          {error && <p className="form-error">{error}</p>}
+        <Modal {...modalProps} title="Adicionar imagem" footer={<DialogFooter form="image-dialog" saving={saving} label="Adicionar" onClose={close} />}>
+          <form id="image-dialog" onSubmit={(e) => void submit(e, () => api.addImage(file, name), 'Imagem adicionada')} className="space-y-4 px-5 py-4">
+            <PathInput label="Arquivo" kind="image" value={file} onChange={setFile} required hint="O arquivo continua onde está; a biblioteca só guarda o caminho." />
+            <FormField label="Nome (opcional)">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={file.split('\\').pop() || 'Alpine 3.22'} maxLength={80} />
+            </FormField>
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
 
       {dialog?.kind === 'download' && (
-        <Modal title="Baixar imagem" onClose={() => setDialog(null)} onSubmit={(e) => submit(e, () => api.downloadImage(url, name), 'Download iniciado')} footer={footer('Baixar')} wide>
-          <label className="field">
-            <span>URL (https)</span>
-            <input className="mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://dl-cdn.alpinelinux.org/alpine/.../alpine-minirootfs-x86_64.tar.gz" required autoFocus />
-            <small className="muted">O endereço tem que terminar em .tar, .tar.gz, .tar.xz ou .vhdx. Salva em {data.settings.imagesDir}.</small>
-          </label>
-          <label className="field">
-            <span>Nome (opcional)</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-          </label>
-          {error && <p className="form-error">{error}</p>}
+        <Modal
+          {...modalProps}
+          title="Baixar imagem"
+          className="w-[min(640px,calc(100vw-32px))]"
+          footer={<DialogFooter form="image-dialog" saving={saving} label="Baixar" onClose={close} />}
+        >
+          <form id="image-dialog" onSubmit={(e) => void submit(e, () => api.downloadImage(url, name), 'Download iniciado')} className="space-y-4 px-5 py-4">
+            <FormField label="URL (https)" hint={`O endereço tem que terminar em .tar, .tar.gz, .tar.xz ou .vhdx. Salva em ${data.settings.imagesDir}.`}>
+              <Input className="font-mono text-[12.5px]" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://dl-cdn.alpinelinux.org/alpine/.../alpine-minirootfs-x86_64.tar.gz" required autoFocus />
+            </FormField>
+            <FormField label="Nome (opcional)">
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+            </FormField>
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
 
       {dialog?.kind === 'delete' && (
-        <Modal
-          title={`Remover ${dialog.image.name}`}
-          onClose={() => setDialog(null)}
-          onSubmit={(e) => submit(e, () => api.deleteImage(dialog.image.id, deleteFile), 'Imagem removida')}
-          footer={footer('Remover', true)}
-        >
-          <p className="muted">Distros já criadas a partir dela não são afetadas.</p>
-          <label className="check">
-            <input type="checkbox" checked={deleteFile} onChange={(e) => setDeleteFile(e.target.checked)} />
-            Apagar também o arquivo ({bytes(dialog.image.size)})
-          </label>
-          {error && <p className="form-error">{error}</p>}
+        <Modal {...modalProps} title={`Remover ${dialog.image.name}`} footer={<DialogFooter form="image-dialog" saving={saving} label="Remover" danger onClose={close} />}>
+          <form id="image-dialog" onSubmit={(e) => void submit(e, () => api.deleteImage(dialog.image.id, deleteFile), 'Imagem removida')} className="space-y-4 px-5 py-4">
+            <Note>Distros já criadas a partir dela não são afetadas.</Note>
+            <Checkbox checked={deleteFile} onChange={setDeleteFile}>
+              Apagar também o arquivo ({bytes(dialog.image.size)})
+            </Checkbox>
+            {error && <FormError>{error}</FormError>}
+          </form>
         </Modal>
       )}
-
-      {dialog?.kind === 'create' && (
-        <NewDistroDialog
-          settings={data.settings}
-          images={data.images}
-          initialImage={dialog.image}
-          onClose={() => setDialog(null)}
-          onStarted={(message) => {
-            setDialog(null);
-            onNotify('ok', message);
-          }}
-        />
-      )}
-    </div>
+    </WithLog>
   );
 }

@@ -1,8 +1,14 @@
+import { ChevronRight, Layers, Play, Plus, Power, Square, Star, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../api';
 import { bytes } from '../format';
 import type { Distro, PanelState } from '../types';
-import { Icon } from './Icon';
+import { Dot, Empty } from './Shell';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { cn } from './ui/cn';
+import { Panel, PanelHeader } from './ui/Panel';
+import { Tip } from './ui/Tip';
 
 interface DistroListProps {
   state: PanelState;
@@ -28,71 +34,91 @@ export function DistroList({ state, onOpen, onNew, onError }: DistroListProps) {
     }
   }
 
-  return (
-    <section className="connection-list">
-      <header className="section-head">
-        <h2>Máquinas</h2>
-        <button className="button primary" onClick={onNew}>
-          <Icon name="plus" />
-          Nova distro
-        </button>
-      </header>
-
-      {state.distros.length === 0 ? (
-        <div className="card empty-state">
-          <Icon name="layers" size={32} />
-          <h2>{state.reachable ? 'Nenhuma distro instalada' : 'Consultando o WSL…'}</h2>
-          <p className="muted">Instale uma da loja online, ou crie a partir de uma imagem ou backup.</p>
-          <button className="button primary" onClick={onNew}>
-            <Icon name="plus" />
+  if (state.distros.length === 0) {
+    return (
+      <Empty
+        icon={<Layers />}
+        action={
+          <Button variant="primary" onClick={onNew}>
+            <Plus />
             Nova distro
-          </button>
-        </div>
-      ) : (
-        <ul className="connection-cards">
-          {state.distros.map((distro) => {
-            const job = jobFor(state, distro);
-            const busy = Boolean(job) || acting === distro.name || !distro.ready;
-            return (
-              <li key={distro.id} className={`card connection-card${distro.running ? ' is-up' : ''}`}>
-                <button className="connection-card-body" onClick={() => onOpen(distro)} title="Abrir a distro">
-                  <span className={`dot ${job ? 'busy' : distro.running ? 'up' : 'idle'}`} />
-                  <span className="list-text">
-                    <strong>{distro.name}</strong>
-                    <span className="muted small">
-                      {job ? job.label : `${distro.running ? 'Rodando' : 'Parada'} · WSL ${distro.version}${distro.vhdSize ? ` · disco ${bytes(distro.vhdSize)}` : ''}`}
-                    </span>
+          </Button>
+        }
+      >
+        <p className="text-[14px] font-semibold text-fg">{state.reachable ? 'Nenhuma distro instalada' : 'Consultando o WSL…'}</p>
+        Instale uma da loja online, ou crie a partir de uma imagem ou backup.
+      </Empty>
+    );
+  }
+
+  const running = state.distros.filter((distro) => distro.running).length;
+  return (
+    <Panel className="overflow-hidden">
+      <PanelHeader
+        title="Máquinas"
+        description={`${state.distros.length} distro(s) · ${running} rodando`}
+        actions={
+          <Button size="sm" variant="primary" onClick={onNew}>
+            <Plus />
+            Nova distro
+          </Button>
+        }
+      />
+      <ul className="divide-y divide-line">
+        {state.distros.map((distro) => {
+          const job = jobFor(state, distro);
+          const busy = Boolean(job) || acting === distro.name || !distro.ready;
+          return (
+            <li key={distro.id} className={cn('flex items-center gap-2 pr-4', distro.running && 'bg-ok-soft/30')}>
+              <button
+                className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left outline-none hover:bg-panel-2/50 focus-visible:bg-panel-2"
+                onClick={() => onOpen(distro)}
+              >
+                <Dot state={job ? 'busy' : distro.running ? 'up' : 'idle'} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13.5px] font-medium">{distro.name}</span>
+                  <span className="block truncate text-[12px] text-fg-muted">
+                    {job ? job.label : `${distro.running ? 'Rodando' : 'Parada'} · WSL ${distro.version}${distro.vhdSize ? ` · disco ${bytes(distro.vhdSize)}` : ''}`}
                   </span>
-                  <span className="connection-tags">
-                    {distro.isDefault && (
-                      <span className="chip chip-accent">
-                        <Icon name="star" size={11} /> Padrão
-                      </span>
-                    )}
-                    {distro.flavor && <span className="chip">{[distro.flavor, distro.osVersion].filter(Boolean).join(' ')}</span>}
-                    {state.pending.distros.includes(distro.name) && <span className="chip chip-warn">reiniciar</span>}
-                  </span>
-                  <Icon name="chevron" />
-                </button>
-                <button className="icon-button" title="Abrir terminal" onClick={() => act(distro, () => api.terminal(distro.name))} disabled={busy}>
-                  <Icon name="terminal" />
-                </button>
-                {distro.running ? (
-                  <button className="button" onClick={() => act(distro, () => api.stop(distro.name))} disabled={busy}>
-                    <Icon name="stop" />
-                    {acting === distro.name ? 'Parando…' : 'Parar'}
-                  </button>
-                ) : (
-                  <button className="button primary" onClick={() => act(distro, () => api.start(distro.name))} disabled={busy}>
-                    <Icon name="play" />
-                    {acting === distro.name ? 'Iniciando…' : 'Iniciar'}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+                </span>
+                <span className="flex shrink-0 flex-wrap justify-end gap-1.5 max-md:hidden">
+                  {distro.isDefault && (
+                    <Badge tone="accent">
+                      <Star /> Padrão
+                    </Badge>
+                  )}
+                  {distro.autostart && (
+                    <Tip content="Inicia com o Windows">
+                      <Badge tone="ok">
+                        <Power /> Com o Windows
+                      </Badge>
+                    </Tip>
+                  )}
+                  {distro.flavor && <Badge>{[distro.flavor, distro.osVersion].filter(Boolean).join(' ')}</Badge>}
+                  {state.pending.distros.includes(distro.name) && <Badge tone="warn">reiniciar</Badge>}
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-fg-subtle" />
+              </button>
+              <Tip content="Abrir terminal">
+                <Button size="icon" variant="ghost" className="size-7" onClick={() => void act(distro, () => api.terminal(distro.name))} disabled={busy} aria-label="Abrir terminal">
+                  <SquareTerminal />
+                </Button>
+              </Tip>
+              {distro.running ? (
+                <Button size="sm" className="w-24 justify-center" onClick={() => void act(distro, () => api.stop(distro.name))} disabled={busy}>
+                  <Square />
+                  {acting === distro.name ? 'Parando…' : 'Parar'}
+                </Button>
+              ) : (
+                <Button size="sm" variant="primary" className="w-24 justify-center" onClick={() => void act(distro, () => api.start(distro.name))} disabled={busy}>
+                  <Play />
+                  {acting === distro.name ? 'Iniciando…' : 'Iniciar'}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
   );
 }

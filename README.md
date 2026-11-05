@@ -15,7 +15,7 @@ Windows host
 Same layout as [WSL-Vpn](../WSL-Vpn):
 
 - **server/** – Express API (TypeScript run natively by Node 24) on `127.0.0.1:4313`. Drives `wsl.exe`, reads the distro list from the registry (`HKCU\...\Lxss`) and streams state, progress and log to the UI with Server-Sent Events. Settings, images and backups are stored in `~/.wsl-config/data.json` (override with `WSLCONFIG_HOME`).
-- **client/** – React + Vite UI on `127.0.0.1:5313` (proxies `/api`).
+- **client/** – React + Vite + Tailwind 4 + Radix (Geist font, Lucide icons) on `127.0.0.1:5313` (proxies `/api`). Same layout as the other desktop panels (Audable, Gituser…): its own title bar with the menus and the command center (Ctrl+Shift+P opens the command palette, with every distro's start, stop, terminal and start-with-Windows), an activity bar with the tabs below and a status bar with the distros, the VM memory, the jobs in progress and the WSL version.
 - **desktop/** – Electron shell and NSIS installer.
 
 ## Usage
@@ -45,6 +45,7 @@ Every registered distro with its state, WSL version and disk size; start, stop, 
 
 - **Disco**: size of the `ext4.vhdx` on Windows and the space used inside Linux; **resize** and **move** to another folder.
 - **Backups**: back up, save as an image, **duplicate** (export + import under a new name).
+- **Iniciar com o Windows**: starts the distro when you log on to Windows and keeps it running (see below).
 - **Usuário padrão**: chosen from the users that exist in the distro (`wsl --manage --set-default-user`). When `wsl.conf` has `[user] default`, which wins over it, that key is updated too.
 - **wsl.conf**: form for systemd, boot command, automount, hostname, `/etc/hosts` and `resolv.conf` generation, interop and Windows PATH, timezone; or raw text. The previous file is kept as `/etc/wsl.conf.bak`. The distro shows *reiniciar* until it is stopped and started again.
 - **Excluir** (`wsl --unregister`), confirmed by typing the distro name.
@@ -80,6 +81,16 @@ Root filesystems (`.tar`, `.tar.gz`, `.tar.xz`) and disks (`.vhdx`) that new dis
 Exports grouped by distro (`wsl --export`, `tar.gz` by default). A backup can be restored **as a new distro** or **replacing** the original (unregister + import under the same name and folder, confirmed by typing the name). The backup file is never deleted by a restore, so a failed one can be retried.
 
 The gear icon sets the folders for new distros, backups and images, and the default backup format.
+
+## Start with Windows
+
+A distro with no process left is shut down by WSL a few seconds later, so "starting it at logon" means starting it **and keeping it up**. The switch on the distro screen writes a value to `HKCUSoftwareMicrosoftWindowsCurrentVersionRun` (`WSL-Config.Start.<name>`) with:
+
+```
+conhost.exe --headless wsl.exe -d <name> --exec /bin/sh -c "while :; do sleep 3600; done"
+```
+
+`conhost --headless` gives the hidden `wsl.exe` no window, and the loop is plain POSIX `sh` (Alpine's busybox included). Nothing runs elevated: turning the switch off, or deleting the distro, removes the value. Stopping the distro (or `wsl --shutdown`) ends it until the next logon. The value also shows in Windows' Startup apps, where it can be turned off too.
 
 ## Disk operations and the WSL VM
 

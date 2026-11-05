@@ -1,10 +1,11 @@
+import { Save } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api } from '../api';
-import { formatLabels } from '../format';
-import { exportFormats, type ExportFormat, type Settings } from '../types';
-import { PathInput } from './Fields';
-import { Icon } from './Icon';
-import { Modal } from './Modal';
+import type { Settings } from '../types';
+import { FormatSelect } from './DistroDialogs';
+import { FormError, Note, PathInput } from './Fields';
+import { Button } from './ui/Button';
+import { Modal } from './ui/Modal';
 
 interface SettingsDialogProps {
   settings: Settings;
@@ -34,38 +35,31 @@ export function SettingsDialog({ settings, onClose, onSaved }: SettingsDialogPro
 
   return (
     <Modal
+      open
+      onOpenChange={(open) => !open && onClose()}
       title="Pastas e preferências"
-      onClose={onClose}
-      onSubmit={submit}
-      wide
+      description="Onde o app guarda distros novas, backups e imagens. Arquivos que já existem não são movidos."
+      className="w-[min(640px,calc(100vw-32px))]"
       footer={
         <>
-          <span className="spacer" />
-          <button type="button" className="button ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" className="button primary" disabled={saving}>
-            <Icon name="save" />
+          </Button>
+          <Button type="submit" form="settings-dialog" variant="primary" disabled={saving}>
+            <Save />
             {saving ? 'Salvando…' : 'Salvar'}
-          </button>
+          </Button>
         </>
       }
     >
-      <PathInput label="Novas distros" kind="folder" value={draft.distrosDir} onChange={(value) => set('distrosDir', value)} required hint="Cada distro criada pelo app ganha uma subpasta aqui." />
-      <PathInput label="Backups" kind="folder" value={draft.backupsDir} onChange={(value) => set('backupsDir', value)} required />
-      <PathInput label="Imagens baixadas e exportadas" kind="folder" value={draft.imagesDir} onChange={(value) => set('imagesDir', value)} required />
-      <label className="field">
-        <span>Formato padrão dos backups</span>
-        <select value={draft.backupFormat} onChange={(e) => set('backupFormat', e.target.value as ExportFormat)}>
-          {exportFormats.map((format) => (
-            <option key={format} value={format}>
-              {formatLabels[format]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted small">Arquivos que já existem não são movidos.</p>
-      {error && <p className="form-error">{error}</p>}
+      <form id="settings-dialog" onSubmit={submit} className="space-y-4 px-5 py-4">
+        <PathInput label="Novas distros" kind="folder" value={draft.distrosDir} onChange={(value) => set('distrosDir', value)} required hint="Cada distro criada pelo app ganha uma subpasta aqui." />
+        <PathInput label="Backups" kind="folder" value={draft.backupsDir} onChange={(value) => set('backupsDir', value)} required />
+        <PathInput label="Imagens baixadas e exportadas" kind="folder" value={draft.imagesDir} onChange={(value) => set('imagesDir', value)} required />
+        <FormatSelect value={draft.backupFormat} onChange={(value) => set('backupFormat', value)} />
+        <Note>O formato vale como padrão dos novos backups; cada backup ainda pode escolher o seu.</Note>
+        {error && <FormError>{error}</FormError>}
+      </form>
     </Modal>
   );
 }
