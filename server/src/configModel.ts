@@ -98,6 +98,8 @@ export const wslConfigFields: readonly FieldSpec[] = [
   { name: 'swapFile', section: 'wsl2', key: 'swapFile', kind: 'text' },
   { name: 'defaultVhdSize', section: 'wsl2', key: 'defaultVhdSize', kind: 'size', min: 1024 },
   { name: 'vmIdleTimeout', section: 'wsl2', key: 'vmIdleTimeout', kind: 'int', min: -1, max: 86_400_000 },
+  // Stops a distro once it has no open session; -1 keeps it (and services like docker) running.
+  { name: 'instanceIdleTimeout', section: 'general', key: 'instanceIdleTimeout', kind: 'int', min: -1, max: 86_400_000 },
   { name: 'localhostForwarding', section: 'wsl2', key: 'localhostForwarding', kind: 'bool' },
   { name: 'nestedVirtualization', section: 'wsl2', key: 'nestedVirtualization', kind: 'bool' },
   { name: 'guiApplications', section: 'wsl2', key: 'guiApplications', kind: 'bool' },

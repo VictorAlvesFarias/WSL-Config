@@ -20,6 +20,7 @@ export const wslConfigGroups: FieldGroup[] = [
       { name: 'swapFile', label: 'Arquivo de swap', kind: 'text', placeholder: '%UserProfile%\\AppData\\Local\\Temp\\swap.vhdx', defaultText: 'na pasta temporária' },
       { name: 'defaultVhdSize', label: 'Tamanho máximo do disco de novas distros', kind: 'size', unit: 'GB', min: 1, defaultText: '1 TB' },
       { name: 'vmIdleTimeout', label: 'Desligar a VM ociosa após', kind: 'int', min: -1, step: 1000, help: 'Em milissegundos; -1 nunca desliga.', defaultText: '60000 (1 minuto)' },
+      { name: 'instanceIdleTimeout', label: 'Desligar a distro sem sessões após', kind: 'int', min: -1, step: 1000, help: 'Em milissegundos; -1 mantém a distro (e serviços como o docker) sempre ligada.', defaultText: 'alguns segundos' },
     ],
   },
   {
