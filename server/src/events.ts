@@ -23,6 +23,8 @@ export interface Distro {
   defaultUid: number;
   osVersion: string;
   flavor: string;
+  /** Started (and kept running) when the user logs on to Windows: see autostart.ts. */
+  autostart: boolean;
 }
 
 /** Long operation (export, import, move...) shown with its progress. */

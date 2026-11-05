@@ -1,3 +1,4 @@
+import { autostartSet } from './autostart.ts';
 import { say, state, updateState, type Distro } from './events.ts';
 import { fileSize, listAll, listRunning, readRegistry, vmMemory, type RegistryDistro } from './wsl.ts';
 
@@ -31,11 +32,13 @@ async function doRefresh(force: boolean): Promise<void> {
     }
 
     const runningSet = new Set(running);
+    const startup = await autostartSet();
     const distros: Distro[] = await Promise.all(
       (registry?.distros ?? []).map(async (item) => ({
         ...item,
         running: runningSet.has(item.name),
         isDefault: item.id === registry?.defaultId,
+        autostart: startup.has(item.name.toLowerCase()),
         vhdSize: await fileSize(item.vhdPath),
       })),
     );

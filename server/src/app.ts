@@ -163,6 +163,12 @@ export function createApp() {
     res.json({ ok: true });
   });
 
+  app.put('/api/distros/:name/autostart', async (req, res) => {
+    const distro = await distros.requireDistro(name(req));
+    await distros.setStartWithWindows(distro.name, body(req).enabled === true);
+    res.json({ ok: true });
+  });
+
   app.post('/api/distros/:name/default', async (req, res) => {
     await distros.makeDefault(name(req));
     res.json({ ok: true });

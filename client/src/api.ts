@@ -36,6 +36,7 @@ export const api = {
   inside: (name: string, start: boolean) => request<DistroInside>('GET', `${distro(name)}/inside${start ? '?start=1' : ''}`),
   start: (name: string) => request<Ok>('POST', `${distro(name)}/start`),
   stop: (name: string) => request<Ok>('POST', `${distro(name)}/stop`),
+  setAutostart: (name: string, enabled: boolean) => request<Ok>('PUT', `${distro(name)}/autostart`, { enabled }),
   makeDefault: (name: string) => request<Ok>('POST', `${distro(name)}/default`),
   terminal: (name: string) => request<Ok>('POST', `${distro(name)}/terminal`),
   files: (name: string) => request<Ok>('POST', `${distro(name)}/files`),

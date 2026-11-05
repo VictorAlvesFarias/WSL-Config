@@ -1,6 +1,7 @@
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { wslConfFields, readFields, writeFields, type FieldValues } from './configModel.ts';
+import { setAutostart } from './autostart.ts';
 import { launch } from './exec.ts';
 import { say, state, updateState, type Distro } from './events.ts';
 import { parseIni, setValue, getValue, toText } from './ini.ts';
@@ -57,6 +58,13 @@ export async function stop(name: string): Promise<void> {
   say(`==> Parando ${distro.name}`);
   await wsl.terminate(distro.name);
   await refreshStatus();
+}
+
+/** Starts the distro at every Windows logon and keeps it running (autostart.ts). */
+export async function setStartWithWindows(name: string, enabled: boolean): Promise<void> {
+  await setAutostart(name, enabled);
+  say(enabled ? `[OK] ${name} vai iniciar com o Windows` : `${name} não inicia mais com o Windows`, enabled ? 'ok' : 'info');
+  await refreshStatus(true);
 }
 
 export async function makeDefault(name: string): Promise<void> {
@@ -174,6 +182,7 @@ export async function remove(name: string): Promise<void> {
   const distro = await requireDistro(name);
   startJob([distro.name], `Excluindo ${distro.name}`, async (context) => {
     await wsl.unregister(distro.name, { onLine: context.log });
+    if (distro.autostart) await setAutostart(distro.name, false).catch(() => undefined);
     return `${distro.name} excluída`;
   });
 }

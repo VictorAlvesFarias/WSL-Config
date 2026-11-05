@@ -20,6 +20,8 @@ export interface Distro {
   defaultUid: number;
   osVersion: string;
   flavor: string;
+  /** Started (and kept running) when the user logs on to Windows. */
+  autostart: boolean;
 }
 
 export interface Job {
